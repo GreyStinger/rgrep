@@ -1,12 +1,12 @@
-mod pipeline {
+mod rgrep {
     use std::io::{BufRead, Write};
 
-    pub struct Parser<'a> {
+    pub struct StdInParser<'a> {
         p_stdin: std::io::Stdin,
         c_writer: CustomWriter<'a>,
     }
 
-    impl<'a> Parser<'_> {
+    impl StdInParser<'_> {
         pub fn new() -> Self {
             Self {
                 p_stdin: std::io::stdin(),
@@ -24,14 +24,36 @@ mod pipeline {
                 let mut matched_patterns = line_clone.match_indices(pattern);
 
                 if let Some(s_match) = matched_patterns.next() {
-                    Self::color_piece_s(&mut line, s_match, &mut matched_patterns);
+                    CustomWriter::color_piece_s(&mut line, s_match, &mut matched_patterns);
                     self.c_writer.print(&line);
                     results += 1;
                 }
-
             }
 
-            self.c_writer.print(&format!("\nTotal Results: {0}", results));
+            self.c_writer
+                .print(&format!("\nTotal Results: {0}", results));
+        }
+
+        pub fn close(&mut self) {
+            self.c_writer.close();
+        }
+    }
+
+    struct CustomWriter<'a> {
+        p_writer: std::io::BufWriter<std::io::StdoutLock<'a>>,
+    }
+
+    impl<'a> CustomWriter<'_> {
+        pub fn new() -> Self {
+            let p_stdout_lock = std::io::stdout().lock();
+
+            Self {
+                p_writer: std::io::BufWriter::new(p_stdout_lock),
+            }
+        }
+
+        fn write_from_buff() {
+            todo!();
         }
 
         /// A start function for color_piece
@@ -75,24 +97,6 @@ mod pipeline {
             }
         }
 
-        pub fn close(&mut self) {
-            self.c_writer.close();
-        }
-    }
-
-    struct CustomWriter<'a> {
-        p_writer: std::io::BufWriter<std::io::StdoutLock<'a>>,
-    }
-
-    impl CustomWriter<'_> {
-        pub fn new() -> Self {
-            let p_stdout_lock = std::io::stdout().lock();
-
-            Self {
-                p_writer: std::io::BufWriter::new(p_stdout_lock),
-            }
-        }
-
         /// Custom higher performance print system for efficient
         /// buffered printing
         pub fn print(&mut self, msg: &String) {
@@ -104,7 +108,7 @@ mod pipeline {
 
         pub fn flush(&mut self) {
             if let Err(e) = self.p_writer.flush() {
-                println!("Pipleline::flush failed");
+                println!("pipeline::CustomWriter::flush failed");
                 dbg!(e);
             }
         }
@@ -132,7 +136,7 @@ fn main() {
         None => usage(),
     };
 
-    let mut pipe_handler = pipeline::Parser::new();
+    let mut pipe_handler = rgrep::StdInParser::new();
     pipe_handler.parse(&pattern);
     pipe_handler.close();
 }
