@@ -16,22 +16,8 @@ mod rgrep {
 
         /// Takes the input from the command line and parses it
         pub fn parse(&mut self, pattern: &String) {
-            let mut results = 0;
-
-            for line in self.p_stdin.lock().lines() {
-                let mut line = line.expect("Could not parse stdin");
-                let line_clone = line.clone();
-                let mut matched_patterns = line_clone.match_indices(pattern);
-
-                if let Some(s_match) = matched_patterns.next() {
-                    CustomWriter::color_piece_s(&mut line, s_match, &mut matched_patterns);
-                    self.c_writer.print(&line);
-                    results += 1;
-                }
-            }
-
             self.c_writer
-                .print(&format!("\nTotal Results: {0}", results));
+                .write_from_buff(&mut self.p_stdin.lock() as &mut dyn BufRead, pattern);
         }
 
         pub fn close(&mut self) {
@@ -52,8 +38,22 @@ mod rgrep {
             }
         }
 
-        fn write_from_buff() {
-            todo!();
+        fn write_from_buff(&mut self, lines_buf: &mut dyn std::io::BufRead, pattern: &String) {
+            let mut results = 0;
+
+            for line in lines_buf.lines() {
+                let mut line = line.expect("Could not parse buffer");
+                let line_clone = line.clone();
+                let mut matched_patterns = line_clone.match_indices(pattern);
+
+                if let Some(s_match) = matched_patterns.next() {
+                    Self::color_piece_s(&mut line, s_match, &mut matched_patterns);
+                    self.print(&line);
+                    results += 1;
+                }
+            }
+
+            self.print(&format!("\nTotal Results: {0}", results));
         }
 
         /// A start function for color_piece
