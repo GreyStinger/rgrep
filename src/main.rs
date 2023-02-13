@@ -1,32 +1,44 @@
 mod rgrep {
-    use std::io::{BufRead, Write};
+    use std::{io::{BufRead, Write, BufReader}, fs::File};
 
-    pub struct StdInParser<'a> {
-        p_stdin: std::io::Stdin,
-        c_writer: CustomWriter<'a>,
-    }
+    pub fn run() {
+        let mut c_writer = CustomWriter::new();
 
-    impl StdInParser<'_> {
-        pub fn new() -> Self {
-            Self {
-                p_stdin: std::io::stdin(),
-                c_writer: CustomWriter::new(),
-            }
+        let usage = || {
+            print!("Bad Usage\n");
+            print!("Use: <command> | rgrep <pattern> or rgrep <pattern> <dir/file>\n");
+            std::process::exit(1);
+        };
+
+        // Get args and look for pattern
+        let mut args = std::env::args();
+        if args.len() < 2 {
+            usage();
+        }
+        let pattern = match args.nth(1) {
+            Some(pattern) => pattern,
+            None => usage(),
+        };
+
+        // Decide what to do for either file or stdin
+        match args.next() {
+            Some(fname) => {
+                // TODO: Add better error handling for the file opening
+                let mut file_handler = BufReader::new(File::open(fname).expect("Failed to open file"));
+                c_writer.write_from_buff(&mut file_handler, &pattern)
+
+            },
+            None => {
+                let stdin = std::io::stdin();
+                c_writer.write_from_buff(&mut stdin.lock() as &mut dyn BufRead, &pattern);
+            },
         }
 
-        /// Takes the input from the command line and parses it
-        pub fn parse(&mut self, pattern: &String) {
-            self.c_writer
-                .write_from_buff(&mut self.p_stdin.lock() as &mut dyn BufRead, pattern);
-        }
-
-        pub fn close(&mut self) {
-            self.c_writer.close();
-        }
+        c_writer.flush();
     }
 
     struct CustomWriter<'a> {
-        p_writer: std::io::BufWriter<std::io::StdoutLock<'a>>,
+        stdout_writer: std::io::BufWriter<std::io::StdoutLock<'a>>,
     }
 
     impl<'a> CustomWriter<'_> {
@@ -34,7 +46,7 @@ mod rgrep {
             let p_stdout_lock = std::io::stdout().lock();
 
             Self {
-                p_writer: std::io::BufWriter::new(p_stdout_lock),
+                stdout_writer: std::io::BufWriter::new(p_stdout_lock),
             }
         }
 
@@ -44,7 +56,8 @@ mod rgrep {
             for line in lines_buf.lines() {
                 let mut line = line.expect("Could not parse buffer");
                 let line_clone = line.clone();
-                let mut matched_patterns = line_clone.match_indices(pattern);
+                let matched_patterns: Vec<(usize, &str)> = line_clone.match_indices(pattern).collect();
+                let mut matched_patterns: std::vec::IntoIter<(usize, &str)> = matched_patterns.into_iter();
 
                 if let Some(s_match) = matched_patterns.next() {
                     Self::color_piece_s(&mut line, s_match, &mut matched_patterns);
@@ -60,7 +73,7 @@ mod rgrep {
         fn color_piece_s(
             s: &mut String,
             current_match: (usize, &'a str),
-            matches: &mut std::str::MatchIndices<&String>,
+            matches: &mut std::vec::IntoIter<(usize, &str)>,
         ) {
             Self::color_piece(s, current_match, matches, 0);
         }
@@ -69,7 +82,7 @@ mod rgrep {
         fn color_piece(
             s: &mut String,
             current_match: (usize, &'a str),
-            matches: &mut std::str::MatchIndices<&String>,
+            matches: &mut std::vec::IntoIter<(usize, &str)>,
             i_add: usize,
         ) {
             let end_char = match s
@@ -100,43 +113,19 @@ mod rgrep {
         /// Custom higher performance print system for efficient
         /// buffered printing
         pub fn print(&mut self, msg: &String) {
-            if let Err(e) = write!(self.p_writer, "{0}\n", msg) {
+            if let Err(e) = write!(self.stdout_writer, "{0}\n", msg) {
                 println!("pipeline::print failed");
                 dbg!(e);
             }
         }
 
         pub fn flush(&mut self) {
-            if let Err(e) = self.p_writer.flush() {
+            if let Err(e) = self.stdout_writer.flush() {
                 println!("pipeline::CustomWriter::flush failed");
                 dbg!(e);
             }
         }
-
-        pub fn close(&mut self) {
-            self.flush();
-        }
     }
 }
 
-fn main() {
-    let usage = || {
-        print!("Missing pattern.\n");
-        print!("Please use it as: <command> | rgrep <pattern>\n");
-        std::process::exit(1);
-    };
-
-    // Get args and look for pattern
-    let mut args = std::env::args();
-    if args.len() < 2 {
-        usage();
-    }
-    let pattern = match args.nth(1) {
-        Some(pattern) => pattern,
-        None => usage(),
-    };
-
-    let mut pipe_handler = rgrep::StdInParser::new();
-    pipe_handler.parse(&pattern);
-    pipe_handler.close();
-}
+fn main() {rgrep::run();}
