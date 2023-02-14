@@ -1,5 +1,8 @@
 mod rgrep {
-    use std::{io::{BufRead, Write, BufReader}, fs::File};
+    use std::{
+        fs::File,
+        io::{BufRead, BufReader, Write},
+    };
 
     pub fn run() {
         let mut c_writer = CustomWriter::new();
@@ -24,14 +27,14 @@ mod rgrep {
         match args.next() {
             Some(fname) => {
                 // TODO: Add better error handling for the file opening
-                let mut file_handler = BufReader::new(File::open(fname).expect("Failed to open file"));
+                let mut file_handler =
+                    BufReader::new(File::open(fname).expect("Failed to open file"));
                 c_writer.write_from_buff(&mut file_handler, &pattern)
-
-            },
+            }
             None => {
                 let stdin = std::io::stdin();
                 c_writer.write_from_buff(&mut stdin.lock() as &mut dyn BufRead, &pattern);
-            },
+            }
         }
 
         c_writer.flush();
@@ -50,14 +53,23 @@ mod rgrep {
             }
         }
 
-        fn write_from_buff(&mut self, lines_buf: &mut dyn std::io::BufRead, pattern: &String) {
-            let mut results = 0;
+        fn write_from_buff(&mut self, lines_buf: &mut dyn std::io::BufRead, pattern: &str) {
+            let mut results: usize = 0;
 
-            for line in lines_buf.lines() {
-                let mut line = line.expect("Could not parse buffer");
+            for line_result in lines_buf.lines() {
+                let mut line = match line_result {
+                    Ok(line) => line,
+                    Err(e) => {
+                        eprintln!("Could not parse buffer: {}", e);
+                        continue;
+                    }
+                };
+
                 let line_clone = line.clone();
-                let matched_patterns: Vec<(usize, &str)> = line_clone.match_indices(pattern).collect();
-                let mut matched_patterns: std::vec::IntoIter<(usize, &str)> = matched_patterns.into_iter();
+                let matched_patterns: Vec<(usize, &str)> =
+                    line_clone.match_indices(pattern).collect();
+                let mut matched_patterns: std::vec::IntoIter<(usize, &str)> =
+                    matched_patterns.into_iter();
 
                 if let Some(s_match) = matched_patterns.next() {
                     Self::color_piece_s(&mut line, s_match, &mut matched_patterns);
@@ -128,4 +140,6 @@ mod rgrep {
     }
 }
 
-fn main() {rgrep::run();}
+fn main() {
+    rgrep::run();
+}
