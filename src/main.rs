@@ -72,7 +72,7 @@ mod rgrep {
                     matched_patterns.into_iter();
 
                 if let Some(s_match) = matched_patterns.next() {
-                    Self::color_piece_s(&mut line, s_match, &mut matched_patterns);
+                    Self::color_piece(&mut line, s_match, &mut matched_patterns, 0);
                     self.print(&line);
                     results += 1;
                 }
@@ -81,45 +81,38 @@ mod rgrep {
             self.print(&format!("\nTotal Results: {0}", results));
         }
 
-        /// A start function for color_piece
-        fn color_piece_s(
-            s: &mut String,
-            current_match: (usize, &'a str),
-            matches: &mut std::vec::IntoIter<(usize, &str)>,
-        ) {
-            Self::color_piece(s, current_match, matches, 0);
-        }
-
-        /// Color the piece that matches the pattern
+        /// For each match of the pattern in the string, adds terminal color codes
+        /// before and after the match. The exact color code used depends on whether
+        /// the match is surrounded by whitespace or not.
+        ///
+        /// # Arguments
+        ///
+        /// * `s` - A mutable string to modify.
+        /// * `current_match` - A tuple containing the starting index and the matched substring.
+        /// * `matches` - An iterator over the remaining matches in the string.
+        /// * `i_add` - The number of characters added to `s` so far.
         fn color_piece(
             s: &mut String,
-            current_match: (usize, &'a str),
+            current_match: (usize, &str),
             matches: &mut std::vec::IntoIter<(usize, &str)>,
             i_add: usize,
         ) {
-            let end_char = match s
+            let end_char = s
                 .chars()
                 .nth(current_match.0 + current_match.1.len() + i_add)
-            {
-                Some(end_char) => end_char,
-                None => ' ',
-            };
-
+                .unwrap_or(' ');
             let is_full = s.chars().nth(current_match.0 + i_add - 1).unwrap() == ' '
                 && (end_char == ' ' || end_char == '\0' || end_char == '\n');
-
-            s.insert_str(current_match.0 + current_match.1.len() + i_add, "\u{1b}[0m");
-
-            if is_full {
-                s.insert_str(current_match.0 + i_add, "\u{1b}[32m");
-            } else {
-                s.insert_str(current_match.0 + i_add, "\u{1b}[31m");
-            }
-
-            if let Some(s_match) = matches.next() {
-                let i_add = i_add + 9; // 9 works, I though it was 15 but idk
-                Self::color_piece(s, s_match, matches, i_add);
-            }
+            let color_code = if is_full { "\u{1b}[32m" } else { "\u{1b}[31m" };
+            let reset_code = "\u{1b}[0m";
+            s.insert_str(current_match.0 + i_add, color_code);
+            s.insert_str(
+                current_match.0 + current_match.1.len() + i_add + color_code.len(),
+                reset_code,
+            );
+            matches
+                .next()
+                .map(|next_match| Self::color_piece(s, next_match, matches, i_add + 9));
         }
 
         /// Custom higher performance print system for efficient
