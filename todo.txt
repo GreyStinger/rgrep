@@ -1,1 +1,2 @@
-Make system to read data from files
+Make system to recursively go through a directory
+Correct tests for rgrep::run()
