@@ -1,6 +1,8 @@
 # RGREP
 
-A rust based simple grepping tool currently only supporting piping
+A clone of grep built in rust
+
+Currently bare-bones but supports both piped data and file + directory searching
 
 ## Compiling for DOS
 

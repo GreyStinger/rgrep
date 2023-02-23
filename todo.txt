@@ -1,2 +1,2 @@
-Make system to recursively go through a directory
+If scanning only one file don't show the filename pre results
 Correct tests for rgrep::run()
