@@ -16,7 +16,7 @@ rustup component add llvm-tools-preview
 Then either build the project and generate a COM file with:
 
 ```bash
-cargo build --profile dos --features no_colour
+cargo build --profile dos --features no_color
 cargo objcopy --profile dos -- -O binary --binary-architecture=i386:x86 rust_dos.com
 ```
 
