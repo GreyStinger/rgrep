@@ -1,8 +1,14 @@
 {
 	"cSpell.words": [
+		"binutils",
 		"mello",
 		"morld",
+		"msdosdjgpp",
+		"objcopy",
+		"realia",
+		"relro",
 		"rgrep",
+		"rustup",
 		"thiserror"
 	]
 }

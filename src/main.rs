@@ -1,3 +1,3 @@
 fn main() {
-    rgrep::run();
+    rgrep_lib::run();
 }

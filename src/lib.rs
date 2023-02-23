@@ -1,3 +1,5 @@
+#![feature(proc_macro_hygiene)]
+
 use clap::{arg, Arg, ArgMatches, Command};
 use lazy_static::lazy_static;
 use std::io::ErrorKind;
@@ -11,8 +13,6 @@ lazy_static! {
         .author("Jayden Andrews")
         .version("1.0")
         .about("A Grep like tool built in rust")
-        // .arg(Arg::new("pattern").index(1).required(true))
-        // .arg(Arg::new("path").index(2).required(false))
         .args([
             arg!(<PATTERN> "Pattern to search for"),
             Arg::new("PATH").required(false),
@@ -145,28 +145,35 @@ impl<'a> CustomWriter<'_> {
         pattern: &str,
     ) -> Result<(), std::io::Error> {
         for line_result in lines_buf.lines() {
-            // let mut line = match line_result {
-            //     Ok(line) => line,
-            //     Err(e) => {
-            //         return Err(e);
-            //     }
-            // };
-            let mut line = line_result?;
+            #[cfg(feature = "no_color")]
+            {
+                let line = line_result?;
+                
+                if line.contains(pattern) {
+                    self.print(&line);
+                    unsafe {T_RESULTS += 1 };
+                }
+            }
 
-            let line_clone = line.clone();
-            let matched_patterns: Vec<(usize, &str)> = line_clone.match_indices(pattern).collect();
-            let mut matched_patterns: std::vec::IntoIter<(usize, &str)> =
-                matched_patterns.into_iter();
+            #[cfg(not(feature = "no_color"))]
+            {
+                let mut line = line_result?;
+                let line_clone = line.clone();
+                let matched_patterns: Vec<(usize, &str)> = line_clone.match_indices(pattern).collect();
+                let mut matched_patterns: std::vec::IntoIter<(usize, &str)> =
+                    matched_patterns.into_iter();
 
-            if let Some(s_match) = matched_patterns.next() {
-                Self::color_piece(&mut line, s_match, &mut matched_patterns, 0);
-                self.print(&line);
-                unsafe { T_RESULTS += 1 };
+                if let Some(s_match) = matched_patterns.next() {
+                    Self::color_piece(&mut line, s_match, &mut matched_patterns, 0);
+                    self.print(&line);
+                    unsafe { T_RESULTS += 1 };
+                }
             }
         }
         Ok(())
     }
 
+    #[cfg(not(feature = "no_color"))]
     /// Recursively applies color codes to a string based on matches of a given pattern.
     ///
     /// # Arguments

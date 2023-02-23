@@ -4,8 +4,39 @@ version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+no_color = []
+
+[lib]
+name = "rgrep_lib"
+path = "src/lib.rs"
+
+[profile.release]
+strip = "debuginfo"
+debug = false
+codegen-units = 1
+opt-level = 3
+lto = true
+panic = "abort"
+
+[profile.dos]
+strip = "debuginfo"
+debug = false
+inherits = "release"
+opt-level = "z"
+codegen-units = 1
+rpath = false
+lto = false
+overflow-checks = false
+
+[[bin]]
+name = "rgrep"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "3.2.23", features = ["derive"] }
 lazy_static = "1.4.0"
 thiserror = "1.0.38"
+
+[package.metadata]
+dos = true
