@@ -11,7 +11,7 @@ use std::{
 lazy_static! {
     static ref ARGS: ArgMatches = Command::new("RGrep")
         .author("Jayden Andrews")
-        .version("1.0")
+        .version("0.1.1")
         .about("A Grep like tool built in rust")
         .args([
             arg!(<PATTERN> "Pattern to search for"),
