@@ -1,63 +1,111 @@
+use clap::{arg, Arg, ArgMatches, Command};
+use lazy_static::lazy_static;
+use std::io::ErrorKind;
 use std::{
     fs::File,
     io::{BufRead, BufReader, Write},
 };
 
-/// Searches for a pattern in a file or stdin and outputs matching lines to stdout.
-///
-/// # Examples
-///
-/// To search for the pattern `foo` in a file:
-///
-/// ```
-/// rgrep::run_with_args(vec!["rgrep", "foo", "path/to/file.txt"]);
-/// ```
-///
-/// To search for the pattern `bar` in stdin:
-///
-/// ```
-/// rgrep::run_with_args(vec!["rgrep", "bar"]);
-/// ```
-pub fn run() {
-    // Get args and look for pattern
-    let args: std::vec::Vec<String> = std::env::args().collect();
-
-	run_with_args(&args);
+lazy_static! {
+    static ref ARGS: ArgMatches = Command::new("RGrep")
+        .author("Jayden Andrews")
+        .version("1.0")
+        .about("A Grep like tool built in rust")
+        // .arg(Arg::new("pattern").index(1).required(true))
+        // .arg(Arg::new("path").index(2).required(false))
+        .args([
+            arg!(<PATTERN> "Pattern to search for"),
+            Arg::new("PATH").required(false),
+            Arg::new("no-exclusion")
+                .long("no-exclusion")
+                .help("Disable exclusion of certain file extensions")
+                .required(false)
+                .action(clap::ArgAction::SetTrue),
+        ])
+        .after_help("This tool is a replica of the grep tool originally \
+            authored by Ken Thompson nearly 50 years ago using a newer \
+            language and generally designed to be a bit more user friendly. \
+            It's not yet quite as fast but it's a lot simpler to read and \
+            understand so please check out its source code if you're interested.")
+        .get_matches();
 }
 
-fn run_with_args(args: &std::vec::Vec<String>) {
+static mut T_RESULTS: usize = 0;
+
+/// Searches for a pattern in a file or stdin and outputs matching lines to stdout.
+pub fn run() {
     let mut c_writer = CustomWriter::new();
 
-    // This closure, `usage`, is used to print an error message indicating that the user
-    // has used the rgrep command incorrectly, and then terminate the program with an exit code of 1.
-    let usage = || {
-        print!("Bad Usage\n");
-        print!("Use: <command> | rgrep <pattern> or rgrep <pattern> <dir/file>\n");
-        std::process::exit(1);
-    };
-
-    if args.len() < 2 {
-        usage();
-    }
-    let pattern = match args.get(1) {
-        Some(pattern) => pattern,
-        None => usage(),
-    };
-
     // Decide what to do for either file or stdin
-    match args.get(2) {
-        Some(fname) => {
-            // TODO: Add better error handling for the file opening
-            let mut file_handler = BufReader::new(File::open(fname).expect("Failed to open file"));
-            c_writer.write_from_buff(&mut file_handler, &pattern)
+    let pattern: &str = ARGS.get_one::<String>("PATTERN").unwrap();
+    match ARGS.get_one::<String>("PATH") {
+        Some(path) => {
+            process_directory(std::path::Path::new(&path), &mut c_writer, pattern);
         }
         None => {
             let stdin = std::io::stdin();
-            c_writer.write_from_buff(&mut stdin.lock(), &pattern);
+            c_writer
+                .write_from_buff(&mut stdin.lock(), pattern)
+                .unwrap();
         }
     }
 
+    c_writer.print(&format!("\nTotal Results: {0}", unsafe { T_RESULTS }));
+
     c_writer.flush();
+}
+
+/// Recursively processes a directory, printing out the name of each file and running
+/// write_from_buff on each file with a specified pattern.
+///
+/// # Arguments
+///
+/// * path - A std::path::Path reference to the directory to process.
+/// * c_writer - A mutable reference to a CustomWriter instance.
+/// * pattern - A string slice specifying the pattern to use when calling write_from_buff.
+///
+/// # Example
+///
+/// ```
+/// use my_lib::CustomWriter;
+/// use std::path::Path;
+///
+/// let path = Path::new("/path/to/directory");
+/// let mut c_writer = CustomWriter::new();
+/// let pattern = "pattern";
+/// process_directory(path, &mut c_writer, pattern);
+/// ```
+fn process_directory(path: &std::path::Path, c_writer: &mut CustomWriter, pattern: &str) {
+    #[cfg(debug_assertions)]
+    c_writer.flush();
+    // check if the path is a directory
+    if let Ok(metadata) = std::fs::metadata(path) {
+        if metadata.is_dir() {
+            // go through each file and directory recursively
+            if let Ok(entries) = std::fs::read_dir(path) {
+                for entry in entries {
+                    if let Ok(entry) = entry {
+                        process_directory(entry.path().as_path(), c_writer, pattern);
+                    }
+                }
+            }
+        } else {
+            let name = match path.file_name() {
+                Some(name) => name.to_str().unwrap_or("Err"),
+                None => "Err",
+            };
+            c_writer.print(&format!("File: {}", name));
+            let mut file_handler = BufReader::new(File::open(path).expect("Failed to open file"));
+            match c_writer.write_from_buff(&mut file_handler, pattern) {
+                Err(e) => {
+                    if !(e.kind() == ErrorKind::InvalidData) {
+                        eprintln!("Could not parse buffer: {}", e);
+                    }
+                }
+                _ => {}
+            };
+        }
+    }
 }
 
 pub struct CustomWriter<'a> {
@@ -91,17 +139,19 @@ impl<'a> CustomWriter<'_> {
     /// let mut writer = CustomWriter::new();
     /// writer.write_from_buff(&mut buffer, "l");
     /// ```
-    pub fn write_from_buff(&mut self, lines_buf: &mut impl std::io::BufRead, pattern: &str) {
-        let mut results: usize = 0;
-
+    pub fn write_from_buff(
+        &mut self,
+        lines_buf: &mut impl std::io::BufRead,
+        pattern: &str,
+    ) -> Result<(), std::io::Error> {
         for line_result in lines_buf.lines() {
-            let mut line = match line_result {
-                Ok(line) => line,
-                Err(e) => {
-                    eprintln!("Could not parse buffer: {}", e);
-                    continue;
-                }
-            };
+            // let mut line = match line_result {
+            //     Ok(line) => line,
+            //     Err(e) => {
+            //         return Err(e);
+            //     }
+            // };
+            let mut line = line_result?;
 
             let line_clone = line.clone();
             let matched_patterns: Vec<(usize, &str)> = line_clone.match_indices(pattern).collect();
@@ -111,11 +161,10 @@ impl<'a> CustomWriter<'_> {
             if let Some(s_match) = matched_patterns.next() {
                 Self::color_piece(&mut line, s_match, &mut matched_patterns, 0);
                 self.print(&line);
-                results += 1;
+                unsafe { T_RESULTS += 1 };
             }
         }
-
-        self.print(&format!("\nTotal Results: {0}", results));
+        Ok(())
     }
 
     /// Recursively applies color codes to a string based on matches of a given pattern.
@@ -146,8 +195,10 @@ impl<'a> CustomWriter<'_> {
             .chars()
             .nth(current_match.0 + current_match.1.len() + i_add)
             .unwrap_or(' ');
-        let is_full = s.chars().nth(current_match.0 + i_add - 1).unwrap() == ' '
-            && (end_char == ' ' || end_char == '\0' || end_char == '\n');
+        let start_char = s.chars().nth(current_match.0 + i_add - 1).unwrap_or(' ');
+
+        let is_full =
+            start_char == ' ' && (end_char == ' ' || end_char == '\0' || end_char == '\n');
         let color_code = if is_full { "\u{1b}[32m" } else { "\u{1b}[31m" };
         let reset_code = "\u{1b}[0m";
         s.insert_str(current_match.0 + i_add, color_code);
