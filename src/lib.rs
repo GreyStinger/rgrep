@@ -105,7 +105,7 @@ fn process_directory(path: &std::path::Path, c_writer: &mut CustomWriter, patter
             match c_writer.write_from_buff(&mut file_handler, pattern) {
                 Ok(lines_written) => {
                     if lines_written {
-                        c_writer.print(&format!("File: {}", name));
+                        c_writer.print(&format!("File: {}\n", name));
                     }
                 }
                 Err(e) => {
