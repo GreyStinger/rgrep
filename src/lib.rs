@@ -27,11 +27,13 @@ lazy_static! {
                 .required(false)
                 .action(clap::ArgAction::SetTrue),
         ])
-        .after_help("This tool is a replica of the grep tool originally \
+        .after_help(
+            "This tool is a replica of the grep tool originally \
             authored by Ken Thompson nearly 50 years ago using a newer \
             language and generally designed to be a bit more user friendly. \
             It's not yet quite as fast but it's a lot simpler to read and \
-            understand so please check out its source code if you're interested.")
+            understand so please check out its source code if you're interested."
+        )
         .get_matches();
 }
 
@@ -99,15 +101,18 @@ fn process_directory(path: &std::path::Path, c_writer: &mut CustomWriter, patter
                 Some(name) => name.to_str().unwrap_or("Err"),
                 None => "Err",
             };
-            c_writer.print(&format!("File: {}", name));
             let mut file_handler = BufReader::new(File::open(path).expect("Failed to open file"));
             match c_writer.write_from_buff(&mut file_handler, pattern) {
+                Ok(lines_written) => {
+                    if lines_written {
+                        c_writer.print(&format!("File: {}", name));
+                    }
+                }
                 Err(e) => {
                     if !(e.kind() == ErrorKind::InvalidData) {
                         eprintln!("Could not parse buffer: {}", e);
                     }
                 }
-                _ => {}
             };
         }
     }
@@ -134,6 +139,10 @@ impl<'a> CustomWriter<'_> {
     /// * `lines_buf` - A mutable reference to a buffer of lines to write.
     /// * `pattern` - A string slice with the pattern to search for in each line.
     ///
+    /// # Returns
+    ///
+    /// True if any lines were written while false if none
+    ///
     /// # Examples
     ///
     /// ```
@@ -148,17 +157,18 @@ impl<'a> CustomWriter<'_> {
         &mut self,
         lines_buf: &mut impl std::io::BufRead,
         pattern: &str,
-    ) -> Result<(), std::io::Error> {
+    ) -> Result<bool, std::io::Error> {
+        let mut lines_written = false;
         let mut line_num = 0;
         for line_result in lines_buf.lines() {
             line_num += 1;
             #[cfg(feature = "no_color")]
             {
                 let line = line_result?;
-                
+
                 if line.contains(pattern) {
                     self.print(&line);
-                    unsafe {T_RESULTS += 1 };
+                    unsafe { T_RESULTS += 1 };
                 }
             }
 
@@ -166,7 +176,8 @@ impl<'a> CustomWriter<'_> {
             {
                 let mut line = line_result?;
                 let line_clone = line.clone();
-                let matched_patterns: Vec<(usize, &str)> = line_clone.match_indices(pattern).collect();
+                let matched_patterns: Vec<(usize, &str)> =
+                    line_clone.match_indices(pattern).collect();
                 let mut matched_patterns: std::vec::IntoIter<(usize, &str)> =
                     matched_patterns.into_iter();
 
@@ -178,11 +189,14 @@ impl<'a> CustomWriter<'_> {
                     } else {
                         self.print(&line);
                     }
+                    if !lines_written {
+                        lines_written = true
+                    };
                     unsafe { T_RESULTS += 1 };
                 }
             }
         }
-        Ok(())
+        Ok(lines_written)
     }
 
     #[cfg(not(feature = "no_color"))]
