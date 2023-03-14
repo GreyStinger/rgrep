@@ -151,6 +151,7 @@ impl<'a> CustomWriter<'_> {
     ) -> Result<(), std::io::Error> {
         let mut line_num = 0;
         for line_result in lines_buf.lines() {
+            line_num += 1;
             #[cfg(feature = "no_color")]
             {
                 let line = line_result?;
@@ -172,7 +173,6 @@ impl<'a> CustomWriter<'_> {
                 if let Some(s_match) = matched_patterns.next() {
                     Self::color_piece(&mut line, s_match, &mut matched_patterns, 0);
                     if ARGS.get_flag("show-lines") {
-                        line_num += 1;
                         let line = line_num.to_string() + "    " + &line.to_string();
                         self.print(&line)
                     } else {
