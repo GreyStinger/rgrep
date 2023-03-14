@@ -21,6 +21,11 @@ lazy_static! {
                 .help("Disable exclusion of certain file extensions")
                 .required(false)
                 .action(clap::ArgAction::SetTrue),
+            Arg::new("show-lines")
+                .long("show-lines")
+                .help("Display line numbers")
+                .required(false)
+                .action(clap::ArgAction::SetTrue),
         ])
         .after_help("This tool is a replica of the grep tool originally \
             authored by Ken Thompson nearly 50 years ago using a newer \
@@ -144,6 +149,7 @@ impl<'a> CustomWriter<'_> {
         lines_buf: &mut impl std::io::BufRead,
         pattern: &str,
     ) -> Result<(), std::io::Error> {
+        let mut line_num = 0;
         for line_result in lines_buf.lines() {
             #[cfg(feature = "no_color")]
             {
@@ -165,7 +171,13 @@ impl<'a> CustomWriter<'_> {
 
                 if let Some(s_match) = matched_patterns.next() {
                     Self::color_piece(&mut line, s_match, &mut matched_patterns, 0);
-                    self.print(&line);
+                    if ARGS.get_flag("show-lines") {
+                        line_num += 1;
+                        let line = line_num.to_string() + "    " + &line.to_string();
+                        self.print(&line)
+                    } else {
+                        self.print(&line);
+                    }
                     unsafe { T_RESULTS += 1 };
                 }
             }
