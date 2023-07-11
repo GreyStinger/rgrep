@@ -26,6 +26,11 @@ lazy_static! {
                 .help("Display line numbers")
                 .required(false)
                 .action(clap::ArgAction::SetTrue),
+            Arg::new("relative-path")
+            .long("relative-path")
+            .help("Display relative paths from scan instead of just file names for big projects")
+            .required(false)
+            .action(clap::ArgAction::SetTrue),
         ])
         .after_help(
             "This tool is a replica of the grep tool originally \
@@ -105,7 +110,15 @@ fn process_directory(path: &std::path::Path, c_writer: &mut CustomWriter, patter
             match c_writer.write_from_buff(&mut file_handler, pattern) {
                 Ok(lines_written) => {
                     if lines_written {
-                        c_writer.print(&format!("File: {}\n", name));
+                        if ARGS.get_flag("relative-path") {
+                            if let Some(path_str) = path.to_str() {
+                                c_writer.print(&format!("File: {}\n", path_str));
+                            } else {
+                                c_writer.print("Failed to convert file path to string\n");
+                            }
+                        } else {
+                            c_writer.print(&format!("File: {}\n", name));
+                        }
                     }
                 }
                 Err(e) => {
